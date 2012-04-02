@@ -19,8 +19,10 @@ public slots:
     void replyFinished();
 
 private:
+    void startRequest(const QNetworkRequest &request);
     QNetworkAccessManager *m_manager;
     QList<QUrl> m_urls;
+    qint64 m_pendingRequests;
 };
 
 #endif // SSLCRAWLER_H
