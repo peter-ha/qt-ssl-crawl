@@ -3,6 +3,8 @@
 
 #include <QObject>
 #include <QNetworkAccessManager>
+#include <QList>
+#include <QUrl>
 
 class SslCrawler : public QObject
 {
@@ -13,10 +15,12 @@ public:
 signals:
 
 public slots:
+    void start();
     void replyFinished();
 
 private:
     QNetworkAccessManager *m_manager;
+    QList<QUrl> m_urls;
 };
 
 #endif // SSLCRAWLER_H

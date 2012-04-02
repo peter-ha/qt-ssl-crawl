@@ -10,17 +10,22 @@ SslCrawler::SslCrawler(QObject *parent) :
     QObject(parent),
     m_manager(new QNetworkAccessManager(this))
 {
-    QFile listFile(QLatin1String("list.txt"));
+    QFile listFile(QLatin1String(":/list.txt"));
     if (!listFile.open(QIODevice::ReadOnly)) {
-        qFatal("could not open file 'list.txt'");
+        qFatal("could not open resource file ':/list.txt'");
     }
     while (!listFile.atEnd()) {
         QByteArray line = listFile.readLine();
         QByteArray domain = line.right(line.count() - line.indexOf(',') - 1)
                             .prepend("https://");
         QUrl url = QUrl::fromEncoded(domain.trimmed());
-        qDebug() << url;
-        QNetworkReply *reply = m_manager->get(QNetworkRequest(url));
+        m_urls.append(url);
+    }
+}
+
+void SslCrawler::start() {
+    for (int a = 0; a < m_urls.count(); ++a) {
+        QNetworkReply *reply = m_manager->get(QNetworkRequest(m_urls.at(a)));
         connect(reply, SIGNAL(finished()), this, SLOT(replyFinished()));
     }
 }

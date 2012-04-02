@@ -6,6 +6,6 @@ int main(int argc, char *argv[])
     QCoreApplication a(argc, argv);
 
     SslCrawler crawler;
-//    crawler.start();
+    crawler.start();
     return a.exec();
 }

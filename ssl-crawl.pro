@@ -20,3 +20,9 @@ SOURCES += main.cpp \
 
 HEADERS += \
     sslcrawler.h
+
+OTHER_FILES += \
+    list.txt
+
+RESOURCES += \
+    list.qrc
