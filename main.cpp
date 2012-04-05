@@ -3,9 +3,10 @@
 
 int main(int argc, char *argv[])
 {
-    QCoreApplication a(argc, argv);
+    QCoreApplication app(argc, argv);
 
     SslCrawler crawler;
+    QObject::connect(&crawler, SIGNAL(crawlFinished()), &app, SLOT(quit()));
     crawler.start();
-    return a.exec();
+    return app.exec();
 }
