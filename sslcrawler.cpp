@@ -52,10 +52,7 @@ void SslCrawler::handleReply() {
 
     if (reply->error() == QNetworkReply::NoError) {
         if (currentUrl.scheme() == QLatin1String("https")) {
-            // success! now we don't want to get an 'operation cancelled error' later
-            // after aborting the reply
-            reply->disconnect(SIGNAL(error(QNetworkReply::NetworkError)));
-
+            // success, now parse the certificate
             QList<QSslCertificate> chain = reply->sslConfiguration().peerCertificateChain();
             if (!chain.empty()) {
                 QString organization = chain.last().issuerInfo(QSslCertificate::Organization);
@@ -67,11 +64,13 @@ void SslCrawler::handleReply() {
                 qWarning() << "weird: no errors but certificate chain is empty for "
                         << reply->url();
             }
+            // we don't want to get an 'operation cancelled error' later
+            reply->disconnect(SIGNAL(error(QNetworkReply::NetworkError)));
             reply->abort(); // no need to load the body
+
         } else if (currentUrl.scheme() == QLatin1String("http")) {
             // check for redirections, we might end up at a SSL site
             int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-            qDebug() << currentUrl << "status code:" << statusCode;
             if (statusCode >= 300 && statusCode < 400) {
                 QByteArray locationHeader = reply->header(QNetworkRequest::LocationHeader).toByteArray();
                 if (locationHeader.isEmpty()) // this seems to be a bug in QtNetwork

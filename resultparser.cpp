@@ -14,6 +14,7 @@ ResultParser::ResultParser(SslCrawler *crawler) :
 void ResultParser::parseResult(const QUrl &originalUrl,
                           const QUrl &urlWithCertificate,
                           const QSslCertificate &certificate) {
+    Q_UNUSED(originalUrl);
     Q_UNUSED(urlWithCertificate);
     QString organization = certificate.issuerInfo(QSslCertificate::Organization);
     qint32 count = m_results.value(organization, 0);
@@ -24,9 +25,12 @@ void ResultParser::parseResult(const QUrl &originalUrl,
 void ResultParser::parseAllResults()
 {
     QHashIterator<QString, qint32> iterator(m_results);
+    qint32 totalNumber = 0;
     while (iterator.hasNext()) {
         iterator.next();
         qDebug() << iterator.key() << ": " << iterator.value();
+        totalNumber += iterator.value();
     }
+    qDebug() << "in total found" << totalNumber << "certificates";
     emit parsingDone();
 }
