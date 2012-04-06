@@ -16,10 +16,12 @@ TEMPLATE = app
 
 
 SOURCES += main.cpp \
-    sslcrawler.cpp
+    sslcrawler.cpp \
+    resultparser.cpp
 
 HEADERS += \
-    sslcrawler.h
+    sslcrawler.h \
+    resultparser.h
 
 OTHER_FILES += \
     list.txt

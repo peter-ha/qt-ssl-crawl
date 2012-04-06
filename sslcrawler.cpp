@@ -53,6 +53,7 @@ void SslCrawler::handleReply() {
     if (reply->error() == QNetworkReply::NoError) {
         if (currentUrl.scheme() == QLatin1String("https")) {
             // success! now we don't want to get an 'operation cancelled error' later
+            // after aborting the reply
             reply->disconnect(SIGNAL(error(QNetworkReply::NetworkError)));
 
             QList<QSslCertificate> chain = reply->sslConfiguration().peerCertificateChain();
@@ -73,11 +74,15 @@ void SslCrawler::handleReply() {
             qDebug() << currentUrl << "status code:" << statusCode;
             if (statusCode >= 300 && statusCode < 400) {
                 QByteArray locationHeader = reply->header(QNetworkRequest::LocationHeader).toByteArray();
+                if (locationHeader.isEmpty()) // this seems to be a bug in QtNetwork
+                    locationHeader = reply->rawHeader("Location");
                 QUrl newUrl = QUrl::fromEncoded(locationHeader);
-                QNetworkRequest request(newUrl);
-                // passing on original URL
-                request.setAttribute(QNetworkRequest::User, reply->request().attribute(QNetworkRequest::User));
-                startRequest(request);
+                if (!newUrl.isEmpty()) {
+                    QNetworkRequest request(newUrl);
+                    // passing on original URL
+                    request.setAttribute(QNetworkRequest::User, reply->request().attribute(QNetworkRequest::User));
+                    startRequest(request);
+                }
             } else {
                 qDebug() << "giving up on" << currentUrl;
             }
