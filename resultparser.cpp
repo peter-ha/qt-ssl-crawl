@@ -15,22 +15,22 @@ void ResultParser::parseResult(const QUrl &originalUrl,
                           const QUrl &urlWithCertificate,
                           const QSslCertificate &certificate) {
     Q_UNUSED(originalUrl);
-    Q_UNUSED(urlWithCertificate);
     QString organization = certificate.issuerInfo(QSslCertificate::Organization);
-    qint32 count = m_results.value(organization, 0);
-    ++count;
-    m_results.insert(organization, count);
+    QSet<QUrl> urlsForOrganization = m_results.value(organization);
+    urlsForOrganization.insert(urlWithCertificate); // same URL might be inserted a lot of times
+    m_results.insert(organization, urlsForOrganization);
 }
 
 void ResultParser::parseAllResults()
 {
-    QHashIterator<QString, qint32> iterator(m_results);
-    qint32 totalNumber = 0;
+    QHashIterator<QString, QSet<QUrl> > iterator(m_results);
+    qint32 totalCount = 0;
     while (iterator.hasNext()) {
         iterator.next();
-        qDebug() << iterator.key() << ": " << iterator.value();
-        totalNumber += iterator.value();
+        qDebug() << iterator.key() << ": " << iterator.value().size();
+        qDebug() << iterator.value().values(); // urls
+        totalCount += iterator.value().size();
     }
-    qDebug() << "in total found" << totalNumber << "certificates";
+    qDebug() << "in total found" << totalCount << "certificates";
     emit parsingDone();
 }

@@ -22,9 +22,10 @@ signals:
 public slots:
     void start();
     void handleReply();
+    void replyFinished();
 
 private:
-    void startRequest(const QNetworkRequest &request);
+    QNetworkReply *startRequest(const QNetworkRequest &request);
     QNetworkAccessManager *m_manager;
     QList<QUrl> m_urls;
     qint64 m_pendingRequests;

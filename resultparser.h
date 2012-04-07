@@ -2,6 +2,8 @@
 #define RESULTPARSER_H
 
 #include <QObject>
+#include <QHash>
+#include <QSet>
 #include "sslcrawler.h"
 
 class ResultParser : public QObject
@@ -20,7 +22,7 @@ public slots:
 
 private:
     SslCrawler *m_crawler;
-    QHash<QString, qint32> m_results;
+    QHash<QString, QSet<QUrl> > m_results;
 };
 
 #endif // RESULTPARSER_H

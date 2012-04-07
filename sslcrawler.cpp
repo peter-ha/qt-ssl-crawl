@@ -12,14 +12,14 @@ SslCrawler::SslCrawler(QObject *parent) :
     m_manager(new QNetworkAccessManager(this)),
     m_pendingRequests(0)
 {
+    // ### do we even need a resource file?
     QFile listFile(QLatin1String(":/list.txt"));
     if (!listFile.open(QIODevice::ReadOnly)) {
         qFatal("could not open resource file ':/list.txt'");
     }
     while (!listFile.atEnd()) {
         QByteArray line = listFile.readLine();
-        // 1st try: just prepend 'https://' to the URL and see whether it works
-        QByteArray domain = line.right(line.count() - line.indexOf(',') - 1).prepend("http://");
+        QByteArray domain = line.right(line.count() - line.indexOf(',') - 1).prepend("http://www.");
         QUrl url = QUrl::fromEncoded(domain.trimmed());
         m_urls.append(url);
     }
@@ -37,11 +37,14 @@ void SslCrawler::start() {
     }
 }
 
-void SslCrawler::startRequest(const QNetworkRequest &request) {
+QNetworkReply *SslCrawler::startRequest(const QNetworkRequest &request) {
+
     QNetworkReply *reply = m_manager->get(request);
+    reply->ignoreSslErrors(); // we don't care, we just want the certificate
     connect(reply, SIGNAL(metaDataChanged()), this, SLOT(handleReply()));
     connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(handleReply()));
     ++m_pendingRequests;
+    return reply;
 }
 
 void SslCrawler::handleReply() {
@@ -64,12 +67,12 @@ void SslCrawler::handleReply() {
                 qWarning() << "weird: no errors but certificate chain is empty for "
                         << reply->url();
             }
-            // we don't want to get an 'operation cancelled error' later
             reply->disconnect(SIGNAL(error(QNetworkReply::NetworkError)));
             reply->abort(); // no need to load the body
+            reply->deleteLater();
 
         } else if (currentUrl.scheme() == QLatin1String("http")) {
-            // check for redirections, we might end up at a SSL site
+            // check for redirections, we might end up at an SSL site
             int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
             if (statusCode >= 300 && statusCode < 400) {
                 QByteArray locationHeader = reply->header(QNetworkRequest::LocationHeader).toByteArray();
@@ -78,8 +81,7 @@ void SslCrawler::handleReply() {
                 QUrl newUrl = QUrl::fromEncoded(locationHeader);
                 if (!newUrl.isEmpty()) {
                     QNetworkRequest request(newUrl);
-                    // passing on original URL
-                    request.setAttribute(QNetworkRequest::User, reply->request().attribute(QNetworkRequest::User));
+                    request.setAttribute(QNetworkRequest::User, originalUrl);
                     startRequest(request);
                 }
             } else {
@@ -92,38 +94,54 @@ void SslCrawler::handleReply() {
     } else { // there was an error
 
         qDebug() << "error with" << currentUrl << reply->errorString();
-        QUrl newUrl;
-        QString currentHost = currentUrl.host();
-
-        if (currentHost == originalUrl.host()) {
-
-            // 2nd try: https://secure.[originalDomain]
-            newUrl = currentUrl;
-            currentHost.prepend("secure.");
-            newUrl.setHost(currentHost);
-        } else if(currentHost == originalUrl.host().prepend("secure.")) {
-
-            // 3rd try: https://login.[originalDomain]
-            newUrl = currentUrl;
-            currentHost.replace(QRegExp(QLatin1String("^secure\\.")), "login.");
-            newUrl.setHost(currentHost);
-        } else if (currentUrl.scheme() == QLatin1String("https")) {
-            // 4th try: if trying https://*.[originalDomain] failed, just try
-            // http://[originalDomain] and see whether we end up with a
-            // redirect to a SSL site
-            newUrl = originalUrl;
-            newUrl.setScheme("http");
+        // 2nd try: if https://[domain] does not work, fetch
+        // http://[domain] and parse the HTML for https:// URLs
+        if (originalUrl.host() == currentUrl.host()) {
+            QNetworkRequest request(originalUrl); // ### probably we can just copy it
+            request.setAttribute(QNetworkRequest::User, originalUrl);
+            QNetworkReply *reply = startRequest(request);
+            connect(reply, SIGNAL(finished()), this, SLOT(replyFinished()));
+            reply->disconnect(SIGNAL(metaDataChanged())); // not interesting any more, wait for finished
+            reply->disconnect(SIGNAL(error(QNetworkReply::NetworkError))); // we handle that in finished now
         } else {
-            qDebug() << "error for" << originalUrl;
-        }
-        if (!newUrl.isEmpty()) {
-            // try the new URL
-            QNetworkRequest request(newUrl);
-            qDebug() << "trying" << newUrl;
-            request.setAttribute(QNetworkRequest::User, reply->request().attribute(QNetworkRequest::User));
-            startRequest(request);
+            qWarning() << "could not fetch" << currentUrl;
         }
     }
+    --m_pendingRequests;
+    qDebug() << "pending requests:" << m_pendingRequests;
+    if (m_pendingRequests == 0) {
+        emit crawlFinished();
+    }
+}
+
+void SslCrawler::replyFinished() {
+
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    QUrl currentUrl = reply->url();
+    QUrl originalUrl = reply->request().attribute(QNetworkRequest::User).toUrl();
+    if (reply->error() == QNetworkReply::NoError) {
+        qDebug() << "reply finished:" << currentUrl << ", now grep for urls";
+        QByteArray replyData = reply->readAll();
+        // just grep for https:// URLs
+        QRegExp regExp("(https://[a-z0-9.@:]+)", Qt::CaseInsensitive);
+        int pos = 0;
+        while ((pos = regExp.indexIn(replyData, pos)) != -1) {
+            QUrl foundUrl(regExp.cap(1));
+            // the '.' makes sure we do not parse the same url all over again
+            if (foundUrl.isValid() && foundUrl.host().endsWith(originalUrl.host().prepend('.'))) {
+                qDebug() << "found valid url at" << foundUrl << "for" << originalUrl;
+                QNetworkRequest request(foundUrl);
+                // ### request copy constructor should copy attributes
+                request.setAttribute(QNetworkRequest::User, originalUrl);
+                startRequest(request);
+                break;
+            }
+            pos += regExp.matchedLength();
+        }
+    } else {
+        qWarning() << "got error while parsing" << currentUrl << "for" << originalUrl;
+    }
+    reply->deleteLater();
     --m_pendingRequests;
     qDebug() << "pending requests:" << m_pendingRequests;
     if (m_pendingRequests == 0) {
