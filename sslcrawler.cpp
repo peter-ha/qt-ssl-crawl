@@ -6,6 +6,7 @@
 #include <QSslCertificate>
 #include <QSslConfiguration>
 #include <QCoreApplication>
+#include <QStringList>
 
 SslCrawler::SslCrawler(QObject *parent) :
     QObject(parent),
@@ -58,11 +59,11 @@ void SslCrawler::handleReply() {
             // success, now parse the certificate
             QList<QSslCertificate> chain = reply->sslConfiguration().peerCertificateChain();
             if (!chain.empty()) {
-                QString organization = chain.last().issuerInfo(QSslCertificate::Organization);
+                QStringList organizations = chain.last().issuerInfo(QSslCertificate::Organization);
                 // original url might be different from url that is reachable over SSL,
                 // e.g. http://mail.ru leads to https://auth.mail.ru
                 emit crawlResult(originalUrl, currentUrl, chain.last());
-                qDebug() << originalUrl << currentUrl << "organization:" << organization;
+                qDebug() << originalUrl << currentUrl << "organization:" << organizations;
             } else {
                 qWarning() << "weird: no errors but certificate chain is empty for "
                         << reply->url();
@@ -97,12 +98,15 @@ void SslCrawler::handleReply() {
         // 2nd try: if https://[domain] does not work, fetch
         // http://[domain] and parse the HTML for https:// URLs
         if (originalUrl.host() == currentUrl.host()) {
-            QNetworkRequest request(originalUrl); // ### probably we can just copy it
-            request.setAttribute(QNetworkRequest::User, originalUrl);
-            QNetworkReply *reply = startRequest(request);
-            connect(reply, SIGNAL(finished()), this, SLOT(replyFinished()));
+            QNetworkRequest newRequest(originalUrl); // ### probably we can just copy it
+            newRequest.setAttribute(QNetworkRequest::User, originalUrl);
+            QNetworkReply *newReply = startRequest(newRequest);
+            connect(newReply, SIGNAL(finished()), this, SLOT(replyFinished()));
             reply->disconnect(SIGNAL(metaDataChanged())); // not interesting any more, wait for finished
             reply->disconnect(SIGNAL(error(QNetworkReply::NetworkError))); // we handle that in finished now
+            reply->close();
+            reply->abort();
+            reply->deleteLater();
         } else {
             qWarning() << "could not fetch" << currentUrl;
         }
@@ -127,8 +131,9 @@ void SslCrawler::replyFinished() {
         int pos = 0;
         while ((pos = regExp.indexIn(replyData, pos)) != -1) {
             QUrl foundUrl(regExp.cap(1));
-            // the '.' makes sure we do not parse the same url all over again
-            if (foundUrl.isValid() && foundUrl.host().endsWith(originalUrl.host().prepend('.'))) {
+            if (foundUrl.isValid()
+                && foundUrl.host().contains('.') // filter out https://ssl
+                && foundUrl.host() != originalUrl.host()) {
                 qDebug() << "found valid url at" << foundUrl << "for" << originalUrl;
                 QNetworkRequest request(foundUrl);
                 // ### request copy constructor should copy attributes
@@ -141,6 +146,10 @@ void SslCrawler::replyFinished() {
     } else {
         qWarning() << "got error while parsing" << currentUrl << "for" << originalUrl;
     }
+    reply->disconnect(SIGNAL(metaDataChanged())); // not interesting any more, wait for finished
+    reply->disconnect(SIGNAL(error(QNetworkReply::NetworkError))); // we handle that in finished now
+    reply->close();
+    reply->abort();
     reply->deleteLater();
     --m_pendingRequests;
     qDebug() << "pending requests:" << m_pendingRequests;

@@ -1,6 +1,7 @@
 #include "resultparser.h"
 
 #include <QDebug>
+#include <QStringList>
 
 ResultParser::ResultParser(SslCrawler *crawler) :
     QObject(crawler),
@@ -15,10 +16,12 @@ void ResultParser::parseResult(const QUrl &originalUrl,
                           const QUrl &urlWithCertificate,
                           const QSslCertificate &certificate) {
     Q_UNUSED(originalUrl);
-    QString organization = certificate.issuerInfo(QSslCertificate::Organization);
-    QSet<QUrl> urlsForOrganization = m_results.value(organization);
-    urlsForOrganization.insert(urlWithCertificate); // same URL might be inserted a lot of times
-    m_results.insert(organization, urlsForOrganization);
+    QStringList organizations = certificate.issuerInfo(QSslCertificate::Organization);
+    for (int a = 0; a < organizations.count(); ++a) {
+        QSet<QUrl> urlsForOrganization = m_results.value(organizations.at(a));
+        urlsForOrganization.insert(urlWithCertificate); // ### same URL might be inserted a lot of times
+        m_results.insert(organizations.at(a), urlsForOrganization);
+    }
 }
 
 void ResultParser::parseAllResults()
@@ -30,6 +33,7 @@ void ResultParser::parseAllResults()
         qDebug() << iterator.key() << ": " << iterator.value().size();
         qDebug() << iterator.value().values(); // urls
         totalCount += iterator.value().size();
+        qDebug() << "";
     }
     qDebug() << "in total found" << totalCount << "certificates";
     emit parsingDone();
