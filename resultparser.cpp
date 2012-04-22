@@ -30,11 +30,11 @@ void ResultParser::parseAllResults()
     qint32 totalCount = 0;
     while (iterator.hasNext()) {
         iterator.next();
-        qDebug() << iterator.key() << ": " << iterator.value().size();
-        qDebug() << iterator.value().values(); // urls
+        qWarning() << iterator.key() << ": " << iterator.value().size();
+        qWarning() << iterator.value().values(); // urls
         totalCount += iterator.value().size();
-        qDebug() << "";
+        qWarning() << "";
     }
-    qDebug() << "in total found" << totalCount << "certificates";
+    qWarning() << "in total found" << totalCount << "certificates";
     emit parsingDone();
 }

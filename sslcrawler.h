@@ -7,6 +7,7 @@
 #include <QList>
 #include <QUrl>
 #include <QSslCertificate>
+#include <QSet>
 
 class SslCrawler : public QObject
 {
@@ -21,14 +22,19 @@ signals:
 
 public slots:
     void start();
-    void handleReply();
+    void replyMetaDataChanged();
+    void replyError(QNetworkReply::NetworkError error);
     void replyFinished();
 
 private:
-    QNetworkReply *startRequest(const QNetworkRequest &request);
+    void startRequest(const QNetworkRequest &request);
+    void finishRequest(QNetworkReply *reply);
     QNetworkAccessManager *m_manager;
     QList<QUrl> m_urls;
-    qint64 m_pendingRequests;
+    QSet<QUrl> m_visitedUrls;
+//    qint64 m_pendingRequests;
+
+    QSet<QUrl> m_pendingUrls; // temp?
 };
 
 #endif // SSLCRAWLER_H
