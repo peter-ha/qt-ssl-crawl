@@ -30,11 +30,8 @@ private:
     void startRequest(const QNetworkRequest &request);
     void finishRequest(QNetworkReply *reply);
     QNetworkAccessManager *m_manager;
-    QList<QUrl> m_urls;
     QSet<QUrl> m_visitedUrls;
-//    qint64 m_pendingRequests;
-
-    QSet<QUrl> m_pendingUrls; // temp?
+    QSet<QUrl> m_pendingUrls;
 };
 
 #endif // SSLCRAWLER_H
