@@ -8,6 +8,8 @@
 #include <QCoreApplication>
 #include <QStringList>
 
+int SslCrawler::m_concurrentRequests = 200;
+
 SslCrawler::SslCrawler(QObject *parent) :
     QObject(parent),
     m_manager(new QNetworkAccessManager(this))
@@ -21,23 +23,28 @@ SslCrawler::SslCrawler(QObject *parent) :
         QByteArray line = listFile.readLine();
         QByteArray domain = line.right(line.count() - line.indexOf(',') - 1).prepend("https://www.");
         QUrl url = QUrl::fromEncoded(domain.trimmed());
-        m_pendingUrls.insert(url);
-    }
-}
-
-void SslCrawler::start() {
-    QSetIterator<QUrl> iterator(m_pendingUrls);
-    while (iterator.hasNext()) {
-        QUrl url = iterator.next();
         QNetworkRequest request(url);
         // setting the attribute to trace the originating URL,
         // because we might try different URLs or get redirects
         request.setAttribute(QNetworkRequest::User, url);
-        startRequest(request);
+        m_requestsToSend.enqueue(request);
     }
 }
 
-void SslCrawler::startRequest(const QNetworkRequest &request) {
+void SslCrawler::start() {
+    sendMoreRequests();
+}
+
+void SslCrawler::sendMoreRequests() {
+
+    while (m_urlsWaitForFinished.count() < m_concurrentRequests
+           && m_requestsToSend.count() > 0) {
+        QNetworkRequest request = m_requestsToSend.dequeue();
+        sendRequest(request);
+    }
+}
+
+void SslCrawler::sendRequest(const QNetworkRequest &request) {
 
     if (!m_visitedUrls.contains(request.url())) {
         QNetworkReply *reply = m_manager->get(request);
@@ -47,7 +54,7 @@ void SslCrawler::startRequest(const QNetworkRequest &request) {
                 this, SLOT(replyError(QNetworkReply::NetworkError)));
         connect(reply, SIGNAL(finished()), this, SLOT(replyFinished()));
 
-        m_pendingUrls.insert(request.url());
+        m_urlsWaitForFinished.insert(request.url());
     } else {
         qDebug() << "visited" << request.url() << "already.";
     }
@@ -62,10 +69,10 @@ void SslCrawler::finishRequest(QNetworkReply *reply) {
     reply->abort();
     reply->deleteLater();
     m_visitedUrls.insert(reply->url());
-    m_pendingUrls.remove(reply->request().url());
-    qDebug() << "finishRequest pending requests:" << m_pendingUrls.count();
-
-    if (m_pendingUrls.count() == 0) {
+    m_urlsWaitForFinished.remove(reply->request().url());
+    qDebug() << "finishRequest pending requests:" << m_requestsToSend.count() + m_urlsWaitForFinished.count();
+    sendMoreRequests();
+    if (m_urlsWaitForFinished.count() == 0) {
         emit crawlFinished();
     }
 }
@@ -103,7 +110,7 @@ void SslCrawler::replyMetaDataChanged() {
                     qDebug() << "found redirect header at" << currentUrl << "to" << newUrl;
                     QNetworkRequest request(newUrl);
                     request.setAttribute(QNetworkRequest::User, originalUrl);
-                    startRequest(request);
+                    sendRequest(request);
                 }
             } else {
                 qDebug() << "meta data changed for" << currentUrl << "do nothing I guess, wait for finished";
@@ -122,7 +129,7 @@ void SslCrawler::replyMetaDataChanged() {
             QNetworkRequest newRequest(originalUrl); // ### probably we can just copy it
             newRequest.setAttribute(QNetworkRequest::User, originalUrl);
             qDebug() << "starting new request for" << originalUrl;
-            startRequest(newRequest);
+            sendRequest(newRequest);
             finishRequest(reply);
         } else {
             qWarning() << "could not fetch" << currentUrl;
@@ -149,7 +156,7 @@ void SslCrawler::replyError(QNetworkReply::NetworkError error) {
         QNetworkRequest newRequest(newUrl); // ### probably we can just copy it
         newRequest.setAttribute(QNetworkRequest::User, newUrl);
         qDebug() << "starting new request" << newUrl << "original url:" << newUrl;
-        startRequest(newRequest);
+        sendRequest(newRequest);
 //        if (m_pendingUrls.count() == 0) {
 //            emit crawlFinished();
 //        }
@@ -180,7 +187,7 @@ void SslCrawler::replyFinished() {
                 QNetworkRequest request(foundUrl);
                 // ### request copy constructor should copy attributes
                 request.setAttribute(QNetworkRequest::User, originalUrl);
-                startRequest(request);
+                sendRequest(request);
                 break; // ### remove?
             }
             pos += regExp.matchedLength();

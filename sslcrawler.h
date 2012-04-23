@@ -8,6 +8,7 @@
 #include <QUrl>
 #include <QSslCertificate>
 #include <QSet>
+#include <QQueue>
 
 class SslCrawler : public QObject
 {
@@ -27,11 +28,14 @@ public slots:
     void replyFinished();
 
 private:
-    void startRequest(const QNetworkRequest &request);
+    void sendMoreRequests();
+    void sendRequest(const QNetworkRequest &request);
     void finishRequest(QNetworkReply *reply);
     QNetworkAccessManager *m_manager;
     QSet<QUrl> m_visitedUrls;
-    QSet<QUrl> m_pendingUrls;
+    QQueue<QNetworkRequest> m_requestsToSend;
+    QSet<QUrl> m_urlsWaitForFinished;
+    static int m_concurrentRequests;
 };
 
 #endif // SSLCRAWLER_H
