@@ -7,6 +7,7 @@
 #include <QSslConfiguration>
 #include <QCoreApplication>
 #include <QStringList>
+#include <QThreadPool>
 
 int SslCrawler::m_concurrentRequests = 200;
 
@@ -35,7 +36,15 @@ void SslCrawler::start() {
     sendMoreRequests();
 }
 
-void SslCrawler::sendMoreRequests() {
+void SslCrawler::foundUrl(const QUrl &foundUrl, const QUrl &originalUrl) {
+
+    QNetworkRequest request(foundUrl);
+    request.setAttribute(QNetworkRequest::User, originalUrl);
+    m_requestsToSend.enqueue(request);
+    sendMoreRequests();
+}
+
+void SslCrawler::sendMoreRequests() { // ### rename to trySendingMoreRequests or so
 
     while (m_urlsWaitForFinished.count() < m_concurrentRequests
            && m_requestsToSend.count() > 0) {
@@ -48,8 +57,8 @@ void SslCrawler::sendRequest(const QNetworkRequest &request) {
 
     if (!m_visitedUrls.contains(request.url())) {
         QNetworkRequest newRequest(request);
-        // do not keep connections open, in general we will not issue
-        // more than 1 request to the same host
+        // do not keep connections open, we will not issue
+        // more than one request to the same host
         newRequest.setRawHeader("Connection", "close");
         QNetworkReply *reply = m_manager->get(newRequest);
         reply->ignoreSslErrors(); // we don't care, we just want the certificate
@@ -178,26 +187,36 @@ void SslCrawler::replyFinished() {
     if (reply->error() == QNetworkReply::NoError) {
         qDebug() << "reply finished:" << currentUrl << "original url:" << originalUrl << ", now grep for urls";
         QByteArray replyData = reply->readAll();
-        // just grep for https:// URLs
-        QRegExp regExp("(https://[a-z0-9.@:]+)", Qt::CaseInsensitive);
-        int pos = 0;
-        while ((pos = regExp.indexIn(replyData, pos)) != -1) {
-            QUrl foundUrl(regExp.cap(1));
-            if (foundUrl.isValid()
-                && foundUrl.host().contains('.') // filter out 'https://ssl'
-                && foundUrl.host() != originalUrl.host()
-                && foundUrl != currentUrl) { // prevent endless loops
-                qDebug() << "found valid url at" << foundUrl << "for" << originalUrl;
-                QNetworkRequest request(foundUrl);
-                // ### request copy constructor should copy attributes
-                request.setAttribute(QNetworkRequest::User, originalUrl);
-                sendRequest(request);
-                break; // ### remove?
-            }
-            pos += regExp.matchedLength();
-        }
+        // now start the job to find URLs in a new thread
+        UrlFinderRunnable *runnable = new UrlFinderRunnable(replyData, originalUrl, currentUrl);
+        connect(runnable, SIGNAL(foundUrl(QUrl,QUrl)), this, SLOT(foundUrl(QUrl,QUrl)), Qt::QueuedConnection);
+        QThreadPool::globalInstance()->start(runnable);
     } else {
         qWarning() << "got error while parsing" << currentUrl << "for" << originalUrl << reply->errorString();
     }
     finishRequest(reply);
+}
+
+const QRegExp UrlFinderRunnable::m_regExp("(https://[a-z0-9.@:]+)", Qt::CaseInsensitive);
+
+UrlFinderRunnable::UrlFinderRunnable(const QByteArray &data, const QUrl &originalUrl, const QUrl &currentUrl) :
+        QObject(), QRunnable(), m_data(data), m_originalUrl(originalUrl), m_currentUrl(currentUrl) {
+}
+
+void UrlFinderRunnable::run() {
+
+    qDebug() << "UrlFinderRunnable: run()";
+    int pos = 0;
+    while ((pos = m_regExp.indexIn(m_data, pos)) != -1) {
+        QUrl newUrl(m_regExp.cap(1));
+        if (newUrl.isValid()
+            && newUrl.host().contains('.') // filter out 'https://ssl'
+            && newUrl.host() != m_originalUrl.host()
+            && newUrl != m_currentUrl) { // prevent endless loops
+            qDebug() << "runnable: found valid url" << newUrl << "at original url" << m_originalUrl;
+            emit foundUrl(newUrl, m_originalUrl);
+            break; // ### remove?
+        }
+        pos += m_regExp.matchedLength();
+    }
 }
