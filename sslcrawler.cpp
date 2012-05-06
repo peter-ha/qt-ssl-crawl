@@ -47,7 +47,11 @@ void SslCrawler::sendMoreRequests() {
 void SslCrawler::sendRequest(const QNetworkRequest &request) {
 
     if (!m_visitedUrls.contains(request.url())) {
-        QNetworkReply *reply = m_manager->get(request);
+        QNetworkRequest newRequest(request);
+        // do not keep connections open, in general we will not issue
+        // more than 1 request to the same host
+        newRequest.setRawHeader("Connection", "close");
+        QNetworkReply *reply = m_manager->get(newRequest);
         reply->ignoreSslErrors(); // we don't care, we just want the certificate
         connect(reply, SIGNAL(metaDataChanged()), this, SLOT(replyMetaDataChanged()));
         connect(reply, SIGNAL(error(QNetworkReply::NetworkError)),
