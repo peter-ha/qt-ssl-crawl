@@ -30,6 +30,7 @@
 #include <QStringList>
 #include <QThreadPool>
 
+// in reality the number of open connections is higher than the value below
 int QtSslCrawler::m_concurrentRequests = 200;
 
 QtSslCrawler::QtSslCrawler(QObject *parent, int from, int to) :
@@ -61,18 +62,22 @@ QtSslCrawler::QtSslCrawler(QObject *parent, int from, int to) :
 }
 
 void QtSslCrawler::start() {
-    sendMoreRequests();
+    checkForSendingMoreRequests();
 }
 
 void QtSslCrawler::foundUrl(const QUrl &foundUrl, const QUrl &originalUrl) {
 
-    QNetworkRequest request(foundUrl);
-    request.setAttribute(QNetworkRequest::User, originalUrl);
-    m_requestsToSend.enqueue(request);
-    sendMoreRequests();
+    if (!m_visitedUrls.contains(foundUrl) && !m_urlsWaitForFinished.contains(foundUrl)) {
+        QNetworkRequest request(foundUrl);
+        request.setAttribute(QNetworkRequest::User, originalUrl);
+        m_requestsToSend.enqueue(request);
+        checkForSendingMoreRequests();
+    } else {
+        qDebug() << "visited" << foundUrl << "already or visiting it currently.";
+    }
 }
 
-void QtSslCrawler::sendMoreRequests() { // ### rename to trySendingMoreRequests or so
+void QtSslCrawler::checkForSendingMoreRequests() {
 
     while (m_urlsWaitForFinished.count() < m_concurrentRequests
            && m_requestsToSend.count() > 0) {
@@ -83,22 +88,18 @@ void QtSslCrawler::sendMoreRequests() { // ### rename to trySendingMoreRequests 
 
 void QtSslCrawler::sendRequest(const QNetworkRequest &request) {
 
-    if (!m_visitedUrls.contains(request.url())) {
-        QNetworkRequest newRequest(request);
-        // do not keep connections open, we will not issue
-        // more than one request to the same host
-        newRequest.setRawHeader("Connection", "close");
-        QNetworkReply *reply = m_manager->get(newRequest);
-        reply->ignoreSslErrors(); // we don't care, we just want the certificate
-        connect(reply, SIGNAL(metaDataChanged()), this, SLOT(replyMetaDataChanged()));
-        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)),
-                this, SLOT(replyError(QNetworkReply::NetworkError)));
-        connect(reply, SIGNAL(finished()), this, SLOT(replyFinished()));
+    QNetworkRequest newRequest(request);
+    // do not keep connections open, we will not issue
+    // more than one request to the same host
+    newRequest.setRawHeader("Connection", "close");
+    QNetworkReply *reply = m_manager->get(newRequest);
+    reply->ignoreSslErrors(); // we don't care, we just want the certificate
+    connect(reply, SIGNAL(metaDataChanged()), this, SLOT(replyMetaDataChanged()));
+    connect(reply, SIGNAL(error(QNetworkReply::NetworkError)),
+            this, SLOT(replyError(QNetworkReply::NetworkError)));
+    connect(reply, SIGNAL(finished()), this, SLOT(replyFinished()));
 
-        m_urlsWaitForFinished.insert(request.url());
-    } else {
-        qDebug() << "visited" << request.url() << "already.";
-    }
+    m_urlsWaitForFinished.insert(request.url());
 }
 
 void QtSslCrawler::finishRequest(QNetworkReply *reply) {
@@ -112,7 +113,7 @@ void QtSslCrawler::finishRequest(QNetworkReply *reply) {
     m_visitedUrls.insert(reply->url());
     m_urlsWaitForFinished.remove(reply->request().url());
     qDebug() << "finishRequest pending requests:" << m_requestsToSend.count() + m_urlsWaitForFinished.count();
-    sendMoreRequests();
+    checkForSendingMoreRequests();
     if (m_urlsWaitForFinished.count() == 0) {
         emit crawlFinished();
     }

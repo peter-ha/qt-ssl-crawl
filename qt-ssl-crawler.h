@@ -54,7 +54,7 @@ public slots:
     void foundUrl(const QUrl &foundUrl, const QUrl &originalUrl);
 
 private:
-    void sendMoreRequests();
+    void checkForSendingMoreRequests();
     void sendRequest(const QNetworkRequest &request);
     void finishRequest(QNetworkReply *reply);
     QNetworkAccessManager *m_manager;
