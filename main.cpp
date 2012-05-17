@@ -1,5 +1,5 @@
 #include <QtCore/QCoreApplication>
-#include "sslcrawler.h"
+#include "qt-ssl-crawler.h"
 #include "resultparser.h"
 
 int main(int argc, char *argv[])
@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
         from = app.arguments().at(1).toInt();
         to = app.arguments().at(2).toInt();
     }
-    SslCrawler crawler(0, from, to);
+    QtSslCrawler crawler(0, from, to);
     ResultParser parser(&crawler);
     QObject::connect(&parser, SIGNAL(parsingDone()), &app, SLOT(quit()));
     crawler.start();

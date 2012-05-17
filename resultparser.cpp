@@ -3,7 +3,7 @@
 #include <QDebug>
 #include <QStringList>
 
-ResultParser::ResultParser(SslCrawler *crawler) :
+ResultParser::ResultParser(QtSslCrawler *crawler) :
     QObject(crawler),
     m_crawler(crawler)
 {

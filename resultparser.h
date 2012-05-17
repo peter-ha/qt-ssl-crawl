@@ -4,13 +4,13 @@
 #include <QObject>
 #include <QHash>
 #include <QSet>
-#include "sslcrawler.h"
+#include "qt-ssl-crawler.h"
 
 class ResultParser : public QObject
 {
     Q_OBJECT
 public:
-    explicit ResultParser(SslCrawler *crawler);
+    explicit ResultParser(QtSslCrawler *crawler);
 
 signals:
     void parsingDone();
@@ -21,7 +21,7 @@ public slots:
     void parseAllResults();
 
 private:
-    SslCrawler *m_crawler;
+    QtSslCrawler *m_crawler;
     QHash<QString, QSet<QUrl> > m_results;
 };
 

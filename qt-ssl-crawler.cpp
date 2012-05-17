@@ -1,4 +1,4 @@
-#include "sslcrawler.h"
+#include "qt-ssl-crawler.h"
 #include <QFile>
 #include <QUrl>
 #include <QDebug>
@@ -9,9 +9,9 @@
 #include <QStringList>
 #include <QThreadPool>
 
-int SslCrawler::m_concurrentRequests = 200;
+int QtSslCrawler::m_concurrentRequests = 200;
 
-SslCrawler::SslCrawler(QObject *parent, int from, int to) :
+QtSslCrawler::QtSslCrawler(QObject *parent, int from, int to) :
     QObject(parent),
     m_manager(new QNetworkAccessManager(this)),
     m_crawlFrom(from),
@@ -40,11 +40,11 @@ SslCrawler::SslCrawler(QObject *parent, int from, int to) :
     qDebug() << "requests to send:" << m_requestsToSend.count() << currentLine;
 }
 
-void SslCrawler::start() {
+void QtSslCrawler::start() {
     sendMoreRequests();
 }
 
-void SslCrawler::foundUrl(const QUrl &foundUrl, const QUrl &originalUrl) {
+void QtSslCrawler::foundUrl(const QUrl &foundUrl, const QUrl &originalUrl) {
 
     QNetworkRequest request(foundUrl);
     request.setAttribute(QNetworkRequest::User, originalUrl);
@@ -52,7 +52,7 @@ void SslCrawler::foundUrl(const QUrl &foundUrl, const QUrl &originalUrl) {
     sendMoreRequests();
 }
 
-void SslCrawler::sendMoreRequests() { // ### rename to trySendingMoreRequests or so
+void QtSslCrawler::sendMoreRequests() { // ### rename to trySendingMoreRequests or so
 
     while (m_urlsWaitForFinished.count() < m_concurrentRequests
            && m_requestsToSend.count() > 0) {
@@ -61,7 +61,7 @@ void SslCrawler::sendMoreRequests() { // ### rename to trySendingMoreRequests or
     }
 }
 
-void SslCrawler::sendRequest(const QNetworkRequest &request) {
+void QtSslCrawler::sendRequest(const QNetworkRequest &request) {
 
     if (!m_visitedUrls.contains(request.url())) {
         QNetworkRequest newRequest(request);
@@ -81,7 +81,7 @@ void SslCrawler::sendRequest(const QNetworkRequest &request) {
     }
 }
 
-void SslCrawler::finishRequest(QNetworkReply *reply) {
+void QtSslCrawler::finishRequest(QNetworkReply *reply) {
 
     reply->disconnect(SIGNAL(metaDataChanged()));
     reply->disconnect(SIGNAL(error(QNetworkReply::NetworkError)));
@@ -98,7 +98,7 @@ void SslCrawler::finishRequest(QNetworkReply *reply) {
     }
 }
 
-void SslCrawler::replyMetaDataChanged() {
+void QtSslCrawler::replyMetaDataChanged() {
 
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     QUrl currentUrl = reply->url();
@@ -158,7 +158,7 @@ void SslCrawler::replyMetaDataChanged() {
     }
 }
 
-void SslCrawler::replyError(QNetworkReply::NetworkError error) {
+void QtSslCrawler::replyError(QNetworkReply::NetworkError error) {
 
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     QUrl currentUrl = reply->url();
@@ -187,7 +187,7 @@ void SslCrawler::replyError(QNetworkReply::NetworkError error) {
     finishRequest(reply);
 }
 
-void SslCrawler::replyFinished() {
+void QtSslCrawler::replyFinished() {
 
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     QUrl currentUrl = reply->url();

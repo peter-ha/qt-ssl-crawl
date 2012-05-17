@@ -1,5 +1,5 @@
-#ifndef SSLCRAWLER_H
-#define SSLCRAWLER_H
+#ifndef QTSSLCRAWLER_H
+#define QTSSLCRAWLER_H
 
 #include <QObject>
 #include <QNetworkAccessManager>
@@ -11,11 +11,11 @@
 #include <QQueue>
 #include <QRunnable>
 
-class SslCrawler : public QObject
+class QtSslCrawler : public QObject
 {
     Q_OBJECT
 public:
-    explicit SslCrawler(QObject *parent = 0, int from = 0, int to = 0);
+    explicit QtSslCrawler(QObject *parent = 0, int from = 0, int to = 0);
 
 signals:
     void crawlResult(const QUrl &originalUrl, const QUrl &urlWithCertificate,
@@ -60,4 +60,4 @@ private:
     const QRegExp m_regExp;
 };
 
-#endif // SSLCRAWLER_H
+#endif // QTSSLCRAWLER_H

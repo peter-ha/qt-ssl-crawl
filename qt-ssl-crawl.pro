@@ -8,7 +8,7 @@ QT       += core network
 
 QT       -= gui
 
-TARGET = ssl-crawl
+TARGET = qt-ssl-crawl
 CONFIG   += console
 CONFIG   -= app_bundle
 
@@ -16,11 +16,11 @@ TEMPLATE = app
 
 
 SOURCES += main.cpp \
-    sslcrawler.cpp \
+    qt-ssl-crawler.cpp \
     resultparser.cpp
 
 HEADERS += \
-    sslcrawler.h \
+    qt-ssl-crawler.h \
     resultparser.h
 
 OTHER_FILES +=
