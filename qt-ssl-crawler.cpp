@@ -58,7 +58,6 @@ QtSslCrawler::QtSslCrawler(QObject *parent, int from, int to) :
                 break; // no need to crawl the rest of the file
         }
     }
-    qDebug() << "requests to send:" << m_requestsToSend.count() << currentLine;
 }
 
 void QtSslCrawler::start() {

@@ -26,7 +26,8 @@
 
 ResultParser::ResultParser(QtSslCrawler *crawler) :
     QObject(crawler),
-    m_crawler(crawler)
+    m_crawler(crawler),
+    m_outStream(stdout, QIODevice::WriteOnly)
 {
     connect(m_crawler, SIGNAL(crawlResult(QUrl,QUrl,QSslCertificate)),
             this, SLOT(parseResult(QUrl,QUrl,QSslCertificate)));
@@ -36,26 +37,38 @@ ResultParser::ResultParser(QtSslCrawler *crawler) :
 void ResultParser::parseResult(const QUrl &originalUrl,
                           const QUrl &urlWithCertificate,
                           const QSslCertificate &certificate) {
-    Q_UNUSED(originalUrl);
-    QStringList organizations = certificate.issuerInfo(QSslCertificate::Organization);
-    for (int a = 0; a < organizations.count(); ++a) {
-        QSet<QUrl> urlsForOrganization = m_results.value(organizations.at(a));
-        urlsForOrganization.insert(urlWithCertificate); // ### same URL might be inserted a lot of times
-        m_results.insert(organizations.at(a), urlsForOrganization);
+    // there could be more than one "O=" field set in the certificate,
+    // we need to join all the fields
+    QString rootCertOrganizations = certificate.issuerInfo(QSslCertificate::Organization).join(QLatin1String(" / "));
+    QPair<QUrl, QString> pair(urlWithCertificate, rootCertOrganizations);
+    QSet<QUrl> urlsLinkingToCertificateUrl = m_results.value(pair);
+    if (!urlsLinkingToCertificateUrl.contains(originalUrl)) {
+        // the index of our results data structure is the URL and certificate,
+        // the value is all the URLs that link to the URL containing the certificate
+        // (e.g. youtube.com and other sites linking to https://s.ytimg.com)
+        urlsLinkingToCertificateUrl.insert(originalUrl);
+        m_results.insert(pair, urlsLinkingToCertificateUrl);
     }
 }
 
 void ResultParser::parseAllResults()
 {
-    QHashIterator<QString, QSet<QUrl> > iterator(m_results);
+    QHashIterator<QPair<QUrl, QString>, QSet<QUrl> > resultIterator(m_results); // ### make const
     qint32 totalCount = 0;
-    while (iterator.hasNext()) {
-        iterator.next();
-        qWarning() << iterator.key() << ": " << iterator.value().size();
-        qWarning() << iterator.value().values(); // urls
-        totalCount += iterator.value().size();
-        qWarning() << "";
+    while (resultIterator.hasNext()) {
+        resultIterator.next();
+        QPair<QUrl, QString> pair = resultIterator.key();
+        // need to encode the commas in the "Organization" field
+        m_outStream << pair.first.toString() << "," << pair.second.replace(',', "\\,");
+        QSet<QUrl> urls = resultIterator.value();
+        QSetIterator<QUrl> urlIterator(urls);
+        while(urlIterator.hasNext()) {
+            m_outStream << "," << urlIterator.next().toString();
+        }
+        totalCount++;
+        m_outStream << "\n";
     }
     qWarning() << "in total found" << totalCount << "certificates";
+    m_outStream.flush();
     emit parsingDone();
 }

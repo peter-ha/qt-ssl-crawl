@@ -22,10 +22,12 @@
 #ifndef RESULTPARSER_H
 #define RESULTPARSER_H
 
+#include "qt-ssl-crawler.h"
+
 #include <QObject>
 #include <QHash>
 #include <QSet>
-#include "qt-ssl-crawler.h"
+#include <QTextStream>
 
 class ResultParser : public QObject
 {
@@ -43,7 +45,8 @@ public slots:
 
 private:
     QtSslCrawler *m_crawler;
-    QHash<QString, QSet<QUrl> > m_results;
+    QHash<QPair<QUrl, QString>, QSet<QUrl> > m_results;
+    QTextStream m_outStream;
 };
 
 #endif // RESULTPARSER_H
