@@ -243,7 +243,6 @@ void UrlFinderRunnable::run() {
             && newUrl != m_currentUrl) { // prevent endless loops
             qDebug() << "runnable: found valid url" << newUrl << "at original url" << m_originalUrl;
             emit foundUrl(newUrl, m_originalUrl);
-            break; // ### remove?
         }
         pos += m_regExp.matchedLength();
     }
