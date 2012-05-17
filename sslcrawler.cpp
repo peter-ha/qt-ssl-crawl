@@ -205,10 +205,9 @@ void SslCrawler::replyFinished() {
     finishRequest(reply);
 }
 
-const QRegExp UrlFinderRunnable::m_regExp("(https://[a-z0-9.@:]+)", Qt::CaseInsensitive);
-
 UrlFinderRunnable::UrlFinderRunnable(const QByteArray &data, const QUrl &originalUrl, const QUrl &currentUrl) :
-        QObject(), QRunnable(), m_data(data), m_originalUrl(originalUrl), m_currentUrl(currentUrl) {
+        QObject(), QRunnable(), m_data(data), m_originalUrl(originalUrl), m_currentUrl(currentUrl),
+        m_regExp("(https://[a-z0-9.@:]+)", Qt::CaseInsensitive) {
 }
 
 void UrlFinderRunnable::run() {

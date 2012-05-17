@@ -57,7 +57,7 @@ private:
     const QByteArray m_data;
     const QUrl m_originalUrl;
     const QUrl m_currentUrl;
-    static const QRegExp m_regExp;
+    const QRegExp m_regExp;
 };
 
 #endif // SSLCRAWLER_H
