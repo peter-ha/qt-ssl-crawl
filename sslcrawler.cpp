@@ -11,25 +11,33 @@
 
 int SslCrawler::m_concurrentRequests = 200;
 
-SslCrawler::SslCrawler(QObject *parent) :
+SslCrawler::SslCrawler(QObject *parent, int from, int to) :
     QObject(parent),
-    m_manager(new QNetworkAccessManager(this))
+    m_manager(new QNetworkAccessManager(this)),
+    m_crawlFrom(from),
+    m_crawlTo(to)
 {
-    // ### do we even need a resource file?
-    QFile listFile(QLatin1String(":/list.txt"));
-    if (!listFile.open(QIODevice::ReadOnly)) {
-        qFatal("could not open resource file ':/list.txt'");
+    QFile domainFile(QLatin1String("top-1m.csv"));
+    if (!domainFile.open(QIODevice::ReadOnly)) {
+        qFatal("could not open file 'top-1m.csv', download it from http://s3.amazonaws.com/alexa-static/top-1m.csv.zip");
     }
-    while (!listFile.atEnd()) {
-        QByteArray line = listFile.readLine();
-        QByteArray domain = line.right(line.count() - line.indexOf(',') - 1).prepend("https://www.");
-        QUrl url = QUrl::fromEncoded(domain.trimmed());
-        QNetworkRequest request(url);
-        // setting the attribute to trace the originating URL,
-        // because we might try different URLs or get redirects
-        request.setAttribute(QNetworkRequest::User, url);
-        m_requestsToSend.enqueue(request);
+    int currentLine = 0;
+    while (!domainFile.atEnd()) {
+        currentLine++;
+        QByteArray line = domainFile.readLine();
+        if (m_crawlFrom == 0 || m_crawlTo == 0 || (m_crawlFrom <= currentLine && currentLine <= m_crawlTo)) {
+            QByteArray domain = line.right(line.count() - line.indexOf(',') - 1).prepend("https://www.");
+            QUrl url = QUrl::fromEncoded(domain.trimmed());
+            QNetworkRequest request(url);
+            // setting the attribute to trace the originating URL,
+            // because we might try different URLs or get redirects
+            request.setAttribute(QNetworkRequest::User, url);
+            m_requestsToSend.enqueue(request);
+            if (currentLine == m_crawlTo)
+                break; // no need to crawl the rest of the file
+        }
     }
+    qDebug() << "requests to send:" << m_requestsToSend.count() << currentLine;
 }
 
 void SslCrawler::start() {
@@ -205,12 +213,12 @@ UrlFinderRunnable::UrlFinderRunnable(const QByteArray &data, const QUrl &origina
 
 void UrlFinderRunnable::run() {
 
-    qDebug() << "UrlFinderRunnable: run()";
     int pos = 0;
     while ((pos = m_regExp.indexIn(m_data, pos)) != -1) {
         QUrl newUrl(m_regExp.cap(1));
         if (newUrl.isValid()
             && newUrl.host().contains('.') // filter out 'https://ssl'
+            && newUrl.host() != QLatin1String("ssl.")
             && newUrl.host() != m_originalUrl.host()
             && newUrl != m_currentUrl) { // prevent endless loops
             qDebug() << "runnable: found valid url" << newUrl << "at original url" << m_originalUrl;

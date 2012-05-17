@@ -23,8 +23,6 @@ HEADERS += \
     sslcrawler.h \
     resultparser.h
 
-OTHER_FILES += \
-    list.txt
+OTHER_FILES +=
 
-RESOURCES += \
-    list.qrc
+RESOURCES +=
