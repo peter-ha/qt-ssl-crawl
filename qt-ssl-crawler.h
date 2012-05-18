@@ -55,6 +55,7 @@ public slots:
 
 private:
     void checkForSendingMoreRequests();
+    void queueRequestIfNew(const QNetworkRequest &request);
     void sendRequest(const QNetworkRequest &request);
     void finishRequest(QNetworkReply *reply);
     QNetworkAccessManager *m_manager;

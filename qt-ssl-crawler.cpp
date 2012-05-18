@@ -31,7 +31,7 @@
 #include <QThreadPool>
 
 // in reality the number of open connections is higher than the value below
-int QtSslCrawler::m_concurrentRequests = 200;
+int QtSslCrawler::m_concurrentRequests = 100;
 
 QtSslCrawler::QtSslCrawler(QObject *parent, int from, int to) :
     QObject(parent),
@@ -54,7 +54,7 @@ QtSslCrawler::QtSslCrawler(QObject *parent, int from, int to) :
             // setting the attribute to trace the originating URL,
             // because we might try different URLs or get redirects
             request.setAttribute(QNetworkRequest::User, url);
-            m_requestsToSend.enqueue(request);
+            queueRequestIfNew(request); // all requests should be new here
             if (currentLine == m_crawlTo)
                 break; // no need to crawl the rest of the file
         }
@@ -67,14 +67,10 @@ void QtSslCrawler::start() {
 
 void QtSslCrawler::foundUrl(const QUrl &foundUrl, const QUrl &originalUrl) {
 
-    if (!m_visitedUrls.contains(foundUrl) && !m_urlsWaitForFinished.contains(foundUrl)) {
-        QNetworkRequest request(foundUrl);
-        request.setAttribute(QNetworkRequest::User, originalUrl);
-        m_requestsToSend.enqueue(request);
-        checkForSendingMoreRequests();
-    } else {
-        qDebug() << "visited" << foundUrl << "already or visiting it currently.";
-    }
+    QNetworkRequest request(foundUrl);
+    request.setAttribute(QNetworkRequest::User, originalUrl);
+    queueRequestIfNew(request);
+    checkForSendingMoreRequests(); // ### call through event loop?
 }
 
 void QtSslCrawler::checkForSendingMoreRequests() {
@@ -83,6 +79,15 @@ void QtSslCrawler::checkForSendingMoreRequests() {
            && m_requestsToSend.count() > 0) {
         QNetworkRequest request = m_requestsToSend.dequeue();
         sendRequest(request);
+    }
+}
+
+void QtSslCrawler::queueRequestIfNew(const QNetworkRequest &request) {
+
+    if (!m_visitedUrls.contains(request.url()) && !m_urlsWaitForFinished.contains(request.url())) {
+        m_requestsToSend.enqueue(request);
+    } else {
+        qDebug() << "visited" << request.url() << "already or visiting it currently";
     }
 }
 
@@ -110,7 +115,7 @@ void QtSslCrawler::finishRequest(QNetworkReply *reply) {
     reply->close();
     reply->abort();
     reply->deleteLater();
-    m_visitedUrls.insert(reply->url());
+    m_visitedUrls.insert(reply->request().url());
     m_urlsWaitForFinished.remove(reply->request().url());
     qDebug() << "finishRequest pending requests:" << m_requestsToSend.count() + m_urlsWaitForFinished.count();
     checkForSendingMoreRequests();
@@ -152,7 +157,8 @@ void QtSslCrawler::replyMetaDataChanged() {
                     qDebug() << "found redirect header at" << currentUrl << "to" << newUrl;
                     QNetworkRequest request(newUrl);
                     request.setAttribute(QNetworkRequest::User, originalUrl);
-                    sendRequest(request);
+                    queueRequestIfNew(request);
+                    checkForSendingMoreRequests(); // ### call through event loop?
                 }
             } else {
                 qDebug() << "meta data changed for" << currentUrl << "do nothing I guess, wait for finished";
@@ -170,8 +176,8 @@ void QtSslCrawler::replyMetaDataChanged() {
         if (originalUrl.host() == currentUrl.host()) {
             QNetworkRequest newRequest(originalUrl); // ### probably we can just copy it
             newRequest.setAttribute(QNetworkRequest::User, originalUrl);
-            qDebug() << "starting new request for" << originalUrl;
-            sendRequest(newRequest);
+            qDebug() << "queueing new request for" << originalUrl;
+            queueRequestIfNew(newRequest);
             finishRequest(reply);
         } else {
             qWarning() << "could not fetch" << currentUrl;
@@ -197,13 +203,10 @@ void QtSslCrawler::replyError(QNetworkReply::NetworkError error) {
         newUrl.setScheme(QLatin1String("http"));
         QNetworkRequest newRequest(newUrl); // ### probably we can just copy it
         newRequest.setAttribute(QNetworkRequest::User, newUrl);
-        qDebug() << "starting new request" << newUrl << "original url:" << newUrl;
-        sendRequest(newRequest);
-//        if (m_pendingUrls.count() == 0) {
-//            emit crawlFinished();
-//        }
+        qDebug() << "queueing new request" << newUrl << "original url:" << newUrl;
+        queueRequestIfNew(newRequest);
     } else {
-        qWarning() << "could not fetch" << currentUrl << "original url:" << originalUrl;
+        qWarning() << "could not fetch" << currentUrl << "original url:" << originalUrl; // ### try again?
     }
     finishRequest(reply);
 }
