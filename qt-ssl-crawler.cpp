@@ -84,7 +84,9 @@ void QtSslCrawler::checkForSendingMoreRequests() {
 
 void QtSslCrawler::queueRequestIfNew(const QNetworkRequest &request) {
 
-    if (!m_visitedUrls.contains(request.url()) && !m_urlsWaitForFinished.contains(request.url())) {
+    if (!m_visitedUrls.contains(request.url())
+        && !m_urlsWaitForFinished.contains(request.url())
+        && !m_requestsToSend.contains(request)) {
         m_requestsToSend.enqueue(request);
     } else {
         qDebug() << "visited" << request.url() << "already or visiting it currently";
@@ -119,7 +121,7 @@ void QtSslCrawler::finishRequest(QNetworkReply *reply) {
     m_urlsWaitForFinished.remove(reply->request().url());
     qDebug() << "finishRequest pending requests:" << m_requestsToSend.count() + m_urlsWaitForFinished.count();
     checkForSendingMoreRequests();
-    if (m_urlsWaitForFinished.count() == 0) {
+    if (m_urlsWaitForFinished.count() + m_requestsToSend.count() == 0) {
         emit crawlFinished();
     }
 }
@@ -139,9 +141,10 @@ void QtSslCrawler::replyMetaDataChanged() {
             if (!chain.empty()) {
                 QStringList organizations = chain.last().issuerInfo(QSslCertificate::Organization);
                 emit crawlResult(originalUrl, currentUrl, chain.last());
-                qDebug() << "found ssl cert for" << originalUrl << "at" <<
-                        currentUrl << "organizations:" << organizations;
+                qDebug() << "found ssl cert for" << "at" << currentUrl
+                        << "organizations:" << organizations << ", redirected from" << originalUrl;
             } else {
+                // never saw that happen
                 qWarning() << "weird: no errors but certificate chain is empty for " << reply->url();
             }
 
@@ -164,6 +167,7 @@ void QtSslCrawler::replyMetaDataChanged() {
                 qDebug() << "meta data changed for" << currentUrl << "do nothing I guess, wait for finished";
             }
         } else {
+            // never saw that happen
             qWarning() << "scheme for" << currentUrl << "is neither https nor http";
         }
 
