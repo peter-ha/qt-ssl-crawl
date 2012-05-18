@@ -62,7 +62,7 @@ QtSslCrawler::QtSslCrawler(QObject *parent, int from, int to) :
 }
 
 void QtSslCrawler::start() {
-    checkForSendingMoreRequests();
+    QMetaObject::invokeMethod(this, "checkForSendingMoreRequests", Qt::QueuedConnection);
 }
 
 void QtSslCrawler::foundUrl(const QUrl &foundUrl, const QUrl &originalUrl) {
@@ -70,7 +70,7 @@ void QtSslCrawler::foundUrl(const QUrl &foundUrl, const QUrl &originalUrl) {
     QNetworkRequest request(foundUrl);
     request.setAttribute(QNetworkRequest::User, originalUrl);
     queueRequestIfNew(request);
-    checkForSendingMoreRequests(); // ### call through event loop?
+    QMetaObject::invokeMethod(this, "checkForSendingMoreRequests", Qt::QueuedConnection);
 }
 
 void QtSslCrawler::checkForSendingMoreRequests() {
@@ -120,7 +120,7 @@ void QtSslCrawler::finishRequest(QNetworkReply *reply) {
     m_visitedUrls.insert(reply->request().url());
     m_urlsWaitForFinished.remove(reply->request().url());
     qDebug() << "finishRequest pending requests:" << m_requestsToSend.count() + m_urlsWaitForFinished.count();
-    checkForSendingMoreRequests();
+    QMetaObject::invokeMethod(this, "checkForSendingMoreRequests", Qt::QueuedConnection);
     if (m_urlsWaitForFinished.count() + m_requestsToSend.count() == 0) {
         emit crawlFinished();
     }
@@ -161,7 +161,7 @@ void QtSslCrawler::replyMetaDataChanged() {
                     QNetworkRequest request(newUrl);
                     request.setAttribute(QNetworkRequest::User, originalUrl);
                     queueRequestIfNew(request);
-                    checkForSendingMoreRequests(); // ### call through event loop?
+                    QMetaObject::invokeMethod(this, "checkForSendingMoreRequests", Qt::QueuedConnection);
                 }
             } else {
                 qDebug() << "meta data changed for" << currentUrl << "do nothing I guess, wait for finished";
