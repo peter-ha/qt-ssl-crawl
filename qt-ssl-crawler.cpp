@@ -141,8 +141,8 @@ void QtSslCrawler::replyMetaDataChanged() {
             if (!chain.empty()) {
                 QStringList organizations = chain.last().issuerInfo(QSslCertificate::Organization);
                 emit crawlResult(originalUrl, currentUrl, chain.last());
-                qDebug() << "found ssl cert for" << "at" << currentUrl
-                        << "organizations:" << organizations << ", redirected from" << originalUrl;
+                qDebug() << "found ssl cert at" << currentUrl
+                        << "organizations:" << organizations << ", coming from" << originalUrl;
             } else {
                 // never saw that happen
                 qWarning() << "weird: no errors but certificate chain is empty for " << reply->url();
