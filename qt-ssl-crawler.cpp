@@ -140,7 +140,7 @@ void QtSslCrawler::replyMetaDataChanged() {
             QList<QSslCertificate> chain = reply->sslConfiguration().peerCertificateChain();
             if (!chain.empty()) {
                 QStringList organizations = chain.last().issuerInfo(QSslCertificate::Organization);
-                emit crawlResult(originalUrl, currentUrl, chain.last());
+                emit crawlResult(originalUrl, currentUrl, chain);
                 qDebug() << "found ssl cert at" << currentUrl
                         << "organizations:" << organizations << ", coming from" << originalUrl;
             } else {

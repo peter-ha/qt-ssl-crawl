@@ -29,38 +29,45 @@ ResultParser::ResultParser(QtSslCrawler *crawler) :
     m_crawler(crawler),
     m_outStream(stdout, QIODevice::WriteOnly)
 {
-    connect(m_crawler, SIGNAL(crawlResult(QUrl,QUrl,QSslCertificate)),
-            this, SLOT(parseResult(QUrl,QUrl,QSslCertificate)));
+    connect(m_crawler, SIGNAL(crawlResult(QUrl,QUrl,QList<QSslCertificate>)),
+            this, SLOT(parseResult(QUrl,QUrl,QList<QSslCertificate>)));
     connect(m_crawler, SIGNAL(crawlFinished()), this, SLOT(parseAllResults()));
+    m_outStream << "URL containing certificate,site certificate country,root cert organization," <<
+            "root certificate country,linking URLs\n";
 }
 
 void ResultParser::parseResult(const QUrl &originalUrl,
                           const QUrl &urlWithCertificate,
-                          const QSslCertificate &certificate) {
-    // there could be more than one "O=" field set in the certificate,
-    // we need to join all the fields
-    QString rootCertOrganizations = certificate.issuerInfo(QSslCertificate::Organization).join(QLatin1String(" / "));
-    QPair<QUrl, QString> pair(urlWithCertificate, rootCertOrganizations);
-    QSet<QUrl> urlsLinkingToCertificateUrl = m_results.value(pair);
-    if (!urlsLinkingToCertificateUrl.contains(originalUrl)) {
-        // the index of our results data structure is the URL and certificate,
-        // the value is all the URLs that link to the URL containing the certificate
-        // (e.g. youtube.com and other sites linking to https://s.ytimg.com)
-        urlsLinkingToCertificateUrl.insert(originalUrl);
-        m_results.insert(pair, urlsLinkingToCertificateUrl);
+                          const QList<QSslCertificate> &certificateChain) {
+    Result currentResult = m_results.value(urlWithCertificate);
+
+    if (currentResult.sitesContainingLink.empty()) { // first time we encounter this site
+        QSslCertificate lastCertInChain = certificateChain.last();
+        currentResult.siteCertCountry = certificateChain.first().subjectInfo(QSslCertificate::CountryName).join(" / ");
+        currentResult.rootCertCountry = lastCertInChain.issuerInfo(QSslCertificate::CountryName).join(" / ");
+        currentResult.rootCertOrganization =
+                lastCertInChain.issuerInfo(QSslCertificate::Organization).join(QLatin1String(" / "));
+    }
+    if (!currentResult.sitesContainingLink.contains(originalUrl)) {
+        currentResult.sitesContainingLink.insert(originalUrl);
+        m_results.insert(urlWithCertificate, currentResult);
     }
 }
 
 void ResultParser::parseAllResults()
 {
-    QHashIterator<QPair<QUrl, QString>, QSet<QUrl> > resultIterator(m_results); // ### make const
+    QHashIterator<QUrl, Result> resultIterator(m_results);
     qint32 totalCount = 0;
     while (resultIterator.hasNext()) {
         resultIterator.next();
-        QPair<QUrl, QString> pair = resultIterator.key();
+        QUrl urlWithCertificate = resultIterator.key();
+        Result currentResult = resultIterator.value();
         // need to encode the commas in the "Organization" field
-        m_outStream << pair.first.toString() << "," << pair.second.replace(',', "\\,");
-        QSet<QUrl> urls = resultIterator.value();
+        m_outStream << urlWithCertificate.toString() << ","
+                << currentResult.siteCertCountry << ","
+                << currentResult.rootCertOrganization.replace(',', "\\,") << ","
+                << currentResult.rootCertCountry;
+        QSet<QUrl> urls = currentResult.sitesContainingLink;
         QSetIterator<QUrl> urlIterator(urls);
         while(urlIterator.hasNext()) {
             m_outStream << "," << urlIterator.next().toString();

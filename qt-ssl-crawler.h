@@ -40,7 +40,7 @@ public:
 
 signals:
     void crawlResult(const QUrl &originalUrl, const QUrl &urlWithCertificate,
-                     const QSslCertificate &certificate);
+                     const QList<QSslCertificate> &certificateChain);
     void crawlFinished();
 
 public:

@@ -40,12 +40,21 @@ signals:
 
 public slots:
     void parseResult(const QUrl &originalUrl, const QUrl &urlWithCertificate,
-                     const QSslCertificate &certificate);
+                     const QList<QSslCertificate> &certificateChain);
     void parseAllResults();
 
 private:
+    class Result {
+    public:
+        Result() { }
+        QString siteCertCountry;
+        QString rootCertOrganization;
+        QString rootCertCountry;
+        QSet<QUrl> sitesContainingLink;
+    };
+
     QtSslCrawler *m_crawler;
-    QHash<QPair<QUrl, QString>, QSet<QUrl> > m_results;
+    QHash<QUrl, Result> m_results;
     QTextStream m_outStream;
 };
 
