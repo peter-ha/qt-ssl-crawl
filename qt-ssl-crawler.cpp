@@ -173,19 +173,8 @@ void QtSslCrawler::replyMetaDataChanged() {
 
     } else { // there was an error
 
-        qWarning() << "THIS SHOULD NOT BE REACHED";
+        // does not happen
         qDebug() << "error with" << currentUrl << reply->errorString();
-        // 2nd try: if https://[domain] does not work, fetch
-        // http://[domain] and parse the HTML for https:// URLs
-        if (originalUrl.host() == currentUrl.host()) {
-            QNetworkRequest newRequest(originalUrl); // ### probably we can just copy it
-            newRequest.setAttribute(QNetworkRequest::User, originalUrl);
-            qDebug() << "queueing new request for" << originalUrl;
-            queueRequestIfNew(newRequest);
-            finishRequest(reply);
-        } else {
-            qWarning() << "could not fetch" << currentUrl;
-        }
     }
 }
 
