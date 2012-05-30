@@ -52,6 +52,7 @@ public slots:
     void replyError(QNetworkReply::NetworkError error);
     void replyFinished();
     void foundUrl(const QUrl &foundUrl, const QUrl &originalUrl);
+    void timeout();
 
 private:
     Q_INVOKABLE void checkForSendingMoreRequests();
@@ -64,7 +65,8 @@ private:
     QSet<QUrl> m_urlsWaitForFinished;
     int m_crawlFrom;
     int m_crawlTo;
-    static int m_concurrentRequests;
+    static int m_concurrentRequests; // ### rename to reflect staticness
+    static QNetworkRequest::Attribute s_tryCountAttribute;
 };
 
 class UrlFinderRunnable : public QObject, public QRunnable

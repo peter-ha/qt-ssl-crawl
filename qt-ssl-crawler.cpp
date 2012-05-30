@@ -29,9 +29,12 @@
 #include <QCoreApplication>
 #include <QStringList>
 #include <QThreadPool>
+#include <QTimer>
 
 // in reality the number of open connections is higher than the value below
 int QtSslCrawler::m_concurrentRequests = 100;
+QNetworkRequest::Attribute QtSslCrawler::s_tryCountAttribute =
+        static_cast<QNetworkRequest::Attribute>(QNetworkRequest::User + 1);
 
 QtSslCrawler::QtSslCrawler(QObject *parent, int from, int to) :
     QObject(parent),
@@ -73,6 +76,24 @@ void QtSslCrawler::foundUrl(const QUrl &foundUrl, const QUrl &originalUrl) {
     QMetaObject::invokeMethod(this, "checkForSendingMoreRequests", Qt::QueuedConnection);
 }
 
+void QtSslCrawler::timeout() {
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender()->parent());
+    finishRequest(reply);
+    QNetworkRequest request = reply->request();
+    int tryCount = request.attribute(QtSslCrawler::s_tryCountAttribute).toInt();
+    if (tryCount == 0) {
+        qDebug() << "timeout, re-scheduling request for" << request.url();
+        tryCount++;
+        QNetworkRequest newRequest(request);
+        newRequest.setAttribute(QtSslCrawler::s_tryCountAttribute, QVariant(tryCount));
+        m_visitedUrls.remove(reply->request().url()); // hack (has just been inserted by finishRequest)
+        queueRequestIfNew(newRequest);
+    } else {
+        qDebug() << "timeout, tried" << request.url() << "twice, giving up.";
+    }
+    // we called checkForSendingMoreRequests() implicitly with finishRequest()
+}
+
 void QtSslCrawler::checkForSendingMoreRequests() {
 
     while (m_urlsWaitForFinished.count() < m_concurrentRequests
@@ -95,11 +116,20 @@ void QtSslCrawler::queueRequestIfNew(const QNetworkRequest &request) {
 
 void QtSslCrawler::sendRequest(const QNetworkRequest &request) {
 
+    qDebug() << "sending request for" << request.url();
     QNetworkRequest newRequest(request);
     // do not keep connections open, we will not issue
     // more than one request to the same host
     newRequest.setRawHeader("Connection", "close");
     QNetworkReply *reply = m_manager->get(newRequest);
+    // if there is neither error nor success after 5 minutes,
+    // try again one more time and then skip the URL.
+    // (The timer will be destroyed if the reply finished after 5 minutes)
+    QTimer *timer = new QTimer(reply);
+    connect(timer, SIGNAL(timeout()), this, SLOT(timeout()));
+    timer->setSingleShot(true);
+    timer->start(300000); // 5 minutes
+
     reply->ignoreSslErrors(); // we don't care, we just want the certificate
     connect(reply, SIGNAL(metaDataChanged()), this, SLOT(replyMetaDataChanged()));
     connect(reply, SIGNAL(error(QNetworkReply::NetworkError)),
