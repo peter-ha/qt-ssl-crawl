@@ -62,7 +62,6 @@ void ResultParser::parseAllResults()
         resultIterator.next();
         QUrl urlWithCertificate = resultIterator.key();
         Result currentResult = resultIterator.value();
-        // need to encode the commas in the "Organization" field
         m_outStream << urlWithCertificate.toString() << ";"
                 << currentResult.siteCertCountry << ";"
                 << currentResult.rootCertOrganization << ";"
