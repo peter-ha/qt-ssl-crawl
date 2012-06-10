@@ -65,7 +65,7 @@ private:
     QSet<QUrl> m_urlsWaitForFinished;
     int m_crawlFrom;
     int m_crawlTo;
-    static int m_concurrentRequests; // ### rename to reflect staticness
+    static int s_concurrentRequests;
     static QNetworkRequest::Attribute s_tryCountAttribute;
 };
 

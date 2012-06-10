@@ -32,7 +32,7 @@
 #include <QTimer>
 
 // in reality the number of open connections is higher than the value below
-int QtSslCrawler::m_concurrentRequests = 100;
+int QtSslCrawler::s_concurrentRequests = 100;
 QNetworkRequest::Attribute QtSslCrawler::s_tryCountAttribute =
         static_cast<QNetworkRequest::Attribute>(QNetworkRequest::User + 1);
 
@@ -96,7 +96,7 @@ void QtSslCrawler::timeout() {
 
 void QtSslCrawler::checkForSendingMoreRequests() {
 
-    while (m_urlsWaitForFinished.count() < m_concurrentRequests
+    while (m_urlsWaitForFinished.count() < s_concurrentRequests
            && m_requestsToSend.count() > 0) {
         QNetworkRequest request = m_requestsToSend.dequeue();
         sendRequest(request);
