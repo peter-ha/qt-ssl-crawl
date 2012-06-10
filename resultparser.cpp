@@ -32,8 +32,8 @@ ResultParser::ResultParser(QtSslCrawler *crawler) :
     connect(m_crawler, SIGNAL(crawlResult(QUrl,QUrl,QList<QSslCertificate>)),
             this, SLOT(parseResult(QUrl,QUrl,QList<QSslCertificate>)));
     connect(m_crawler, SIGNAL(crawlFinished()), this, SLOT(parseAllResults()));
-    m_outStream << "URL containing certificate,site certificate country,root cert organization," <<
-            "root certificate country,linking URLs\n";
+    m_outStream << "URL containing certificate;site certificate country;root cert organization;" <<
+            "root certificate country;linking URLs\n";
 }
 
 void ResultParser::parseResult(const QUrl &originalUrl,
@@ -63,14 +63,14 @@ void ResultParser::parseAllResults()
         QUrl urlWithCertificate = resultIterator.key();
         Result currentResult = resultIterator.value();
         // need to encode the commas in the "Organization" field
-        m_outStream << urlWithCertificate.toString() << ","
-                << currentResult.siteCertCountry << ","
-                << currentResult.rootCertOrganization.replace(',', "\\,") << ","
+        m_outStream << urlWithCertificate.toString() << ";"
+                << currentResult.siteCertCountry << ";"
+                << currentResult.rootCertOrganization << ";"
                 << currentResult.rootCertCountry;
         QSet<QUrl> urls = currentResult.sitesContainingLink;
         QSetIterator<QUrl> urlIterator(urls);
         while(urlIterator.hasNext()) {
-            m_outStream << "," << urlIterator.next().toString();
+            m_outStream << ";" << urlIterator.next().toString();
         }
         totalCount++;
         m_outStream << "\n";
