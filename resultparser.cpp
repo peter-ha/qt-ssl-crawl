@@ -46,7 +46,7 @@ void ResultParser::parseResult(const QUrl &originalUrl,
         currentResult.siteCertCountry = certificateChain.first().subjectInfo(QSslCertificate::CountryName).join(" / ");
         currentResult.rootCertCountry = lastCertInChain.issuerInfo(QSslCertificate::CountryName).join(" / ");
         currentResult.rootCertOrganization =
-                lastCertInChain.issuerInfo(QSslCertificate::Organization).join(QLatin1String(" / "));
+                lastCertInChain.issuerInfo(QSslCertificate::Organization).join(" / ");
     }
     if (!currentResult.sitesContainingLink.contains(originalUrl)) {
         currentResult.sitesContainingLink.insert(originalUrl);

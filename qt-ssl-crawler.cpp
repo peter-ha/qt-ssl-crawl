@@ -42,7 +42,7 @@ QtSslCrawler::QtSslCrawler(QObject *parent, int from, int to) :
     m_crawlFrom(from),
     m_crawlTo(to)
 {
-    QFile domainFile(QLatin1String("top-1m.csv"));
+    QFile domainFile(QStringLiteral("top-1m.csv"));
     if (!domainFile.open(QIODevice::ReadOnly)) {
         qFatal("could not open file 'top-1m.csv', download it from http://s3.amazonaws.com/alexa-static/top-1m.csv.zip");
     }
@@ -223,7 +223,7 @@ void QtSslCrawler::replyError(QNetworkReply::NetworkError error) {
     // our blind check for https://[domain] was not succesful, try http://[domain] now
     if (originalUrl.host() == currentUrl.host() && currentUrl.scheme() == QLatin1String("https")) {
         QUrl newUrl = currentUrl;
-        newUrl.setScheme(QLatin1String("http"));
+        newUrl.setScheme(QStringLiteral("http"));
         QNetworkRequest newRequest(newUrl); // ### probably we can just copy it
         newRequest.setAttribute(QNetworkRequest::User, newUrl);
         qDebug() << "queueing new request" << newUrl << "original url:" << newUrl;
